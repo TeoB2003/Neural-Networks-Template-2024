@@ -1,4 +1,7 @@
+from http.client import error
+
 import numpy as np
+from sympy.physics.units import length
 from torchvision.datasets import MNIST
 
 def download_mnist(is_train: bool):
@@ -14,89 +17,59 @@ def download_mnist(is_train: bool):
 train_X, train_Y = download_mnist(True)
 test_X, test_Y = download_mnist(False)
 
+def softmax(weights):
+    Z_exp = np.exp(weights)
+    softmax_output = Z_exp / np.sum(Z_exp, axis=1, keepdims=True) #impart fiecare element al lui Z_exp la suma
+    return softmax_output
+
+def cross_entropy_loss(probabilities, labels):
+    log_predictions = np.log(probabilities + 1e-8)
+    weighted_log_predictions = labels * log_predictions
+    return np.mean(np.sum(weighted_log_predictions))
+
 num_features = 784
 num_classes=10
 
-g_weights = np.zeros((num_classes, num_features))
+g_weights = np.zeros((num_features,num_classes))
 g_biases = np.zeros(num_classes)
 
-def train(x_batch, y_batch):
-    global g_weights, g_biases
-    learning_rate = 0.001
-    weights=np.zeros((num_classes, num_features))
-    bias=np.zeros(num_classes)
-    for x in range(len(x_batch)):
-        digit=y_batch[x]
-        classified = np.dot(x_batch[x],g_weights[digit])+ g_biases[digit]
-        #print(f'am clasifcat ca {classified} desi era {y_batch[x]}')
+train_Y = np.eye(10)[train_Y]
+test_Y = np.eye(10)[test_Y]
 
+learning_rate=0.01
 
-        error = digit - classified
-        weights[digit] += + (x_batch[x] * learning_rate * error)
-        bias[digit]+=learning_rate*error*digit
-    return weights, bias
+def train(batch_X, batch_Y):
+    global g_biases, g_weights
+    for i in range(0,len(batch_X)):
+        class_matrix=np.dot(batch_X, g_weights)+ g_biases
+        probabilities=softmax(class_matrix)
+        loss = cross_entropy_loss(probabilities, batch_Y)
+        gradient_loss = probabilities - batch_Y
+        product = np.dot(batch_X.T, gradient_loss) /100
+        for_bias = np.sum(gradient_loss, axis=0) / 100
+        g_biases -= learning_rate * for_bias
+        g_weights -= learning_rate * product
 
+def compute_accuracy(predictions, labels):
+    return np.mean(np.argmax(predictions, axis=1) == np.argmax(labels, axis=1))
 
-def train_all(train_X, train_Y, epochs):
-    global g_weights, g_biases
-
-    train_X = np.array(train_X)
-    train_Y = np.array(train_Y)
-
+def train_all(epochs):
     for epoch in range(epochs):
-        #p = np.random.permutation(len(train_X))
-        #train_X = train_X[p]
-        #train_Y=train_Y[p]
-        """
-        num_batches = len(train_X) // 100
-        for batch in range(num_batches):
-            start = batch * 100
-            end = start + 100
-            x_batch = train_X[start:end]
-            y_batch = train_Y[start:end]
-
-            weights, bias = train(x_batch, y_batch)
-
-            g_weights += weights
-            g_biases += bias
+        for i in range(0, len(train_X), 100):
+            x_batch = np.array(train_X[i:i + 100])
+            y_batch = train_Y[i:i + 100]
+            train(x_batch ,y_batch)
+        train_accuracy = compute_accuracy(softmax(np.dot(train_X, g_weights) + g_biases), train_Y)
+        test_accuracy = compute_accuracy(softmax(np.dot(test_X, g_weights) + g_biases), test_Y)
+        print(f'Epoch {epoch + 1}  - Train Accuracy: {train_accuracy * 100:.2f}% - Test Accuracy: {test_accuracy * 100:.2f}%')
+    final_train_accuracy = compute_accuracy(softmax(np.dot(train_X, g_weights) + g_biases), train_Y)
+    final_test_accuracy = compute_accuracy(softmax(np.dot(test_X, g_weights) + g_biases), test_Y)
+    print(f'Final Test Accuracy: {final_test_accuracy * 100:.2f}%')
 
 
-        if len(train_X) % 100 != 0:
-            x_batch = train_X[num_batches * 100:]
-            y_batch = train_Y[num_batches * 100:]
-            weights, bias = train(x_batch, y_batch)
-            g_weights += weights
-            g_biases += bias
-        """
-        l_weights,l_biases=train(train_X,train_Y)
-        g_biases+=l_biases
-        g_weights+=l_weights
 
 
-def test_model(test_X, test_Y):
-    good_case=0
-    total_cases=0
-    for x in range(0,len(test_X)):
-        total_cases+=1
-        prediction=0
-        diff_min=10
-        for i in range(0,10):
-            diff=(np.dot(g_weights[i], test_X[x])+ g_biases[i])-i
-            print(f'diff pentru {i} este {diff}')
-            if diff_min>diff:
-                diff_min=diff
-                prediction=i
 
-        print(f'am prezis {prediction} si era {test_Y[x]}')
-        if prediction==test_Y[x]:
-            good_case+=1
-
-    accuracy=good_case/total_cases
-    return accuracy
+train_all(2)
 
 
-# Example usage
-train_all(train_X,train_Y,2)
-
-accuracy = test_model(test_X, test_Y)  # Test the model
-print(f'Test accuracy: {accuracy * 100:.2f}%')
