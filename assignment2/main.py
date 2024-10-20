@@ -14,65 +14,89 @@ def download_mnist(is_train: bool):
 train_X, train_Y = download_mnist(True)
 test_X, test_Y = download_mnist(False)
 
-learning_rate=0.001
 num_features = 784
-weights = np.zeros(num_features + 1)
+num_classes=10
 
-def train(nr:int):
-  for i in range(0,3):
-    global weights
-    global learning_rate
-    total_number=0
+g_weights = np.zeros((num_classes, num_features))
+g_biases = np.zeros(num_classes)
+
+def train(x_batch, y_batch):
+    global g_weights, g_biases
+    learning_rate = 0.001
+    weights=np.zeros((num_classes, num_features))
+    bias=np.zeros(num_classes)
+    for x in range(len(x_batch)):
+        digit=y_batch[x]
+        classified = np.dot(x_batch[x],g_weights[digit])+ g_biases[digit]
+        #print(f'am clasifcat ca {classified} desi era {y_batch[x]}')
+
+
+        error = digit - classified
+        weights[digit] += + (x_batch[x] * learning_rate * error)
+        bias[digit]+=learning_rate*error*digit
+    return weights, bias
+
+
+def train_all(train_X, train_Y, epochs):
+    global g_weights, g_biases
+
+    train_X = np.array(train_X)
+    train_Y = np.array(train_Y)
+
+    for epoch in range(epochs):
+        #p = np.random.permutation(len(train_X))
+        #train_X = train_X[p]
+        #train_Y=train_Y[p]
+        """
+        num_batches = len(train_X) // 100
+        for batch in range(num_batches):
+            start = batch * 100
+            end = start + 100
+            x_batch = train_X[start:end]
+            y_batch = train_Y[start:end]
+
+            weights, bias = train(x_batch, y_batch)
+
+            g_weights += weights
+            g_biases += bias
+
+
+        if len(train_X) % 100 != 0:
+            x_batch = train_X[num_batches * 100:]
+            y_batch = train_Y[num_batches * 100:]
+            weights, bias = train(x_batch, y_batch)
+            g_weights += weights
+            g_biases += bias
+        """
+        l_weights,l_biases=train(train_X,train_Y)
+        g_biases+=l_biases
+        g_weights+=l_weights
+
+
+def test_model(test_X, test_Y):
     good_case=0
-    for x in range(0,len(train_X)):
-            total_number+=1
-            input_with_bias = np.append(train_X[x], 1)
-            classified= np.dot(weights, input_with_bias)
-            #print(f'clasificat ca {classified} desi este {train_Y[x]} ')
-            target = 1 if train_Y[x] == nr else -1
+    total_cases=0
+    for x in range(0,len(test_X)):
+        total_cases+=1
+        prediction=0
+        diff_min=10
+        for i in range(0,10):
+            diff=(np.dot(g_weights[i], test_X[x])+ g_biases[i])-i
+            print(f'diff pentru {i} este {diff}')
+            if diff_min>diff:
+                diff_min=diff
+                prediction=i
 
-            if classified*target>0 :
-                good_case+=1
-            else:
-                error = target - classified
-                weights=weights+(input_with_bias*learning_rate*error)
-                #print('Wrong!')
-                #as putea sa ascot if-ul, dar il pastrez pentru claritate
-                #trebuie folosite batchuri
+        print(f'am prezis {prediction} si era {test_Y[x]}')
+        if prediction==test_Y[x]:
+            good_case+=1
+
+    accuracy=good_case/total_cases
+    return accuracy
 
 
-def test():
-    global weights
-    total_test_samples = len(test_X)
-    correct_predictions = np.zeros(10)  # Array to hold correct predictions for each digit
-    total_per_digit = np.zeros(10)       # Array to hold total samples for each digit
-    total_correct = 0                     # Counter for overall correct predictions
+# Example usage
+train_all(train_X,train_Y,2)
 
-    for x in range(total_test_samples):
-        input_with_bias = np.append(test_X[x], 1)
-        classified = np.dot(weights, input_with_bias)
-        prediction = 1 if classified > 0 else 0
-
-        actual_digit = test_Y[x]  # Actual label of the current test sample
-        total_per_digit[actual_digit] += 1  # Increment total count for the actual digit
-
-        if (prediction == 1 and actual_digit == 1) or (prediction == 0 and actual_digit != 1):
-            correct_predictions[actual_digit] += 1  # Increment the correct prediction for the actual digit
-            total_correct += 1  # Increment the overall correct predictions
-
-    # Calculate and print accuracy for each digit
-    for digit in range(10):
-        if total_per_digit[digit] > 0:  # Avoid division by zero
-            accuracy = correct_predictions[digit] / total_per_digit[digit]
-            print(f'Accuracy on test set for digit {digit}: {accuracy * 100:.2f}%')
-        else:
-            print(f'No samples for digit {digit} in the test set.')
-
-    # Calculate and print overall accuracy
-    overall_accuracy = total_correct / total_test_samples
-    print(f'Overall accuracy on test set: {overall_accuracy * 100:.2f}%')
-
-for i in range(0,10):
-    train(i)
-
-test()
+accuracy = test_model(test_X, test_Y)  # Test the model
+print(f'Test accuracy: {accuracy * 100:.2f}%')
