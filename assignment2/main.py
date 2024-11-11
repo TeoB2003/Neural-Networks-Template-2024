@@ -53,7 +53,6 @@ def train_all(epoch):
             y_batch = train_Y[i:i + 100]
             train(x_batch,y_batch)
         test(e)
-    #testare
 
 def test(epoch):
     nr_cases = 0
@@ -73,4 +72,4 @@ def test(epoch):
     accuracy = good_cases / nr_cases
     print(f'In epoca {epoch+1} am acuratete {accuracy*100:.2f}%')
 
-train_all(3)
+train_all(1)
